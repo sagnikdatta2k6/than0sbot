@@ -133,7 +133,7 @@ async def on_member_join(member):
     """Sends a custom welcome message when a new member joins."""
     welcome_channel = discord.utils.get(member.guild.text_channels, name='welcome')
     if welcome_channel:
-        await welcome_channel.send(f"Welcome to the server, {member.mention}! We're glad to have you in our troop!")
+        await welcome_channel.send(f"Welcome to the Jabari, {member.mention}! we heard praises of you from M'Baku!")
 
 @bot.command()
 async def poll(ctx, question: str, *options: str):
