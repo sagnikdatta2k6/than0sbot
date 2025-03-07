@@ -50,7 +50,7 @@ async def on_message(message):
 @bot.command()
 async def hello(ctx):
     """Responds with a greeting."""
-    await ctx.send(f'Hello, {ctx.author.name}!')
+    await ctx.send(f'You have my respect, {ctx.author.name}!')
 
 @bot.command()
 async def summarize(ctx, *, text: str):
@@ -73,13 +73,13 @@ async def on_member_join(member):
     """Sends a custom welcome message when a new member joins."""
     welcome_channel = discord.utils.get(member.guild.text_channels, name='welcome')
     if welcome_channel:
-        await welcome_channel.send(f"Welcome to the server, {member.mention}! We're glad to have you here!")
+        await welcome_channel.send(f"Welcome to the server, {member.mention}! We're glad to have you in our troop!")
 
 @bot.command()
 async def poll(ctx, question: str, *options: str):
     """Create a poll with reactions."""
     if len(options) < 2:
-        await ctx.send("You need at least two options to create a poll.")
+        await ctx.send("Even the wisest choices require atleast two!")
         return
 
     embed = discord.Embed(title=question, description="\n".join([f"{chr(65 + i)}. {option}" for i, option in enumerate(options)]))
