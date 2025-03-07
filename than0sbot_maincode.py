@@ -24,27 +24,37 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 async def on_ready():
     print(f'Logged in as {bot.user}')
 
+async def get_gemini_response(user_message):
+    response = requests.post(
+        f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+        json={"contents": [{"parts": [{"text": user_message}]}]},
+        headers={"Content-Type": "application/json"}
+    )
+    if response.status_code == 200:
+        gemini_response = response.json()
+        reply = gemini_response.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No reply from Gemini.")
+        return reply
+    else:
+        return f'Error connecting to Gemini API: {response.status_code} - {response.text}'
+
+async def send_long_message(channel, message):
+    """Splits long messages into multiple parts and sends them."""
+    for i in range(0, len(message), 2000):
+        await channel.send(message[i:i+2000])
+
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
 
-    # Respond to messages using the Gemini API
-    if message.content.lower().startswith('!chat'):
-        user_message = message.content[6:].strip()
-        response = requests.post(
-            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-            json={"contents": [{"parts": [{"text": user_message}]}]},
-            headers={"Content-Type": "application/json"}
-        )
+    # Respond to messages that start with "$bot"
+    if message.content.lower().startswith("$bot"):
+        user_message = message.content[4:].strip()
+        response = await get_gemini_response(user_message)
+        await send_long_message(message.channel, response)
+        return  # Prevent further command processing
 
-        if response.status_code == 200:
-            gemini_response = response.json()
-            reply = gemini_response.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No reply from Gemini.")
-            await message.channel.send(reply)
-        else:
-            await message.channel.send(f'Error connecting to Gemini API: {response.status_code} - {response.text}')
-
+    # Process bot commands
     await bot.process_commands(message)
 
 @bot.command()
@@ -55,18 +65,8 @@ async def hello(ctx):
 @bot.command()
 async def summarize(ctx, *, text: str):
     """Summarize a long message using Gemini AI."""
-    response = requests.post(
-        f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-        json={"contents": [{"parts": [{"text": f"Summarize this text: {text}"}]}]},
-        headers={"Content-Type": "application/json"}
-    )
-
-    if response.status_code == 200:
-        gemini_response = response.json()
-        summary = gemini_response.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "Couldn't generate a summary.")
-        await ctx.send(f"Summary: {summary}")
-    else:
-        await ctx.send(f'Error summarizing: {response.status_code} - {response.text}')
+    summary = await get_gemini_response(f"Summarize this text: {text}")
+    await send_long_message(ctx.channel, summary)
 
 @bot.event
 async def on_member_join(member):
@@ -79,7 +79,7 @@ async def on_member_join(member):
 async def poll(ctx, question: str, *options: str):
     """Create a poll with reactions."""
     if len(options) < 2:
-        await ctx.send("Even the wisest choices require atleast two!")
+        await ctx.send("Even the wisest choices require at least two!")
         return
 
     embed = discord.Embed(title=question, description="\n".join([f"{chr(65 + i)}. {option}" for i, option in enumerate(options)]))
