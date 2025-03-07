@@ -2,8 +2,8 @@ import discord
 import os
 import requests
 import asyncio
-from datetime import datetime, timezone
-from discord.ext import commands
+from datetime import datetime, timezone, timedelta
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,10 +19,13 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='$', intents=intents)
+reminders = []
+IST = timezone(timedelta(hours=5, minutes=30))  # Define IST timezone
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
+    reminder_checker.start()
 
 async def get_gemini_response(user_message):
     response = requests.post(
@@ -41,6 +44,63 @@ async def send_long_message(channel, message):
     """Splits long messages into multiple parts and sends them."""
     for i in range(0, len(message), 2000):
         await channel.send(message[i:i+2000])
+
+@tasks.loop(seconds=60)
+async def reminder_checker():
+    """Check for reminders and notify users."""
+    now = datetime.now(IST)  # Ensure timezone-aware datetime in IST
+    for reminder in reminders[:]:
+        if now >= reminder['time']:
+            user = bot.get_user(reminder['user_id'])
+            if user:
+                await user.send(f"⏰ Reminder: {reminder['message']}")
+            reminders.remove(reminder)
+
+@bot.command()
+async def set_reminder(ctx, date: str, time: str, *, message: str):
+    """Set a reminder (format: YYYY-MM-DD HH:MM IST)."""
+    try:
+        reminder_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+        reminders.append({"user_id": ctx.author.id, "time": reminder_time, "message": message})
+        await ctx.send(f"Reminder set for {date} {time} IST: {message}")
+    except ValueError:
+        await ctx.send("Invalid date/time format. Use YYYY-MM-DD HH:MM IST.")
+
+@bot.command()
+async def modify_reminder(ctx, index: int, date: str, time: str, *, message: str):
+    """Modify an existing reminder by index."""
+    user_reminders = [r for r in reminders if r['user_id'] == ctx.author.id]
+    if 0 <= index < len(user_reminders):
+        try:
+            new_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M").replace(tzinfo=IST)
+            user_reminders[index]['time'] = new_time
+            user_reminders[index]['message'] = message
+            await ctx.send(f"Reminder updated to: {date} {time} IST - {message}")
+        except ValueError:
+            await ctx.send("Invalid date/time format. Use YYYY-MM-DD HH:MM IST.")
+    else:
+        await ctx.send("Invalid reminder index.")
+
+@bot.command()
+async def list_reminders(ctx):
+    """List all active reminders."""
+    user_reminders = [r for r in reminders if r['user_id'] == ctx.author.id]
+    if not user_reminders:
+        await ctx.send("No active reminders.")
+        return
+
+    reminder_list = "\n".join([f"{i}. {r['time']} IST - {r['message']}" for i, r in enumerate(user_reminders)])
+    await send_long_message(ctx.channel, f"Your active reminders:\n{reminder_list}")
+
+@bot.command()
+async def delete_reminder(ctx, index: int):
+    """Delete a specific reminder by index."""
+    user_reminders = [r for r in reminders if r['user_id'] == ctx.author.id]
+    if 0 <= index < len(user_reminders):
+        reminders.remove(user_reminders[index])
+        await ctx.send("Reminder deleted successfully.")
+    else:
+        await ctx.send("Invalid reminder index.")
 
 @bot.event
 async def on_message(message):
