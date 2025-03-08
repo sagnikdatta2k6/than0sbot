@@ -45,7 +45,7 @@ async def send_long_message(channel, message):
     for i in range(0, len(message), 2000):
         await channel.send(message[i:i+2000])
 
-@tasks.loop(seconds=60)
+@tasks.loop(seconds=0.1)
 async def reminder_checker():
     """Check for reminders and notify users."""
     now = datetime.now(IST)  # Ensure timezone-aware datetime in IST
