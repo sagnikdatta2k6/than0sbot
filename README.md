@@ -111,5 +111,4 @@ Currently manual testing. Auto-test support (pytest) coming soon.
 ## 🛠️ Maintainer
 
 **Sagnik Datta**
-📧 [sagnikdatta2k6@gmail.com](mailto:sagnikdatta2k6@gmail.com)
 🌐 [GitHub Profile](https://github.com/sagnikdatta2k6)
